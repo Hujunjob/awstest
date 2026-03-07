@@ -14,6 +14,7 @@ import os
 import sqlite3
 import ssl
 import statistics
+import sys
 import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
@@ -24,6 +25,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 DEFAULT_DB_PATH = REPO_ROOT / "output" / "predict" / "predict_points.db"
 DEFAULT_PREDICT_API_BASE_URL = "https://api.predict.fun"
 DEFAULT_PREDICT_WS_URL = "wss://ws.predict.fun/ws"
@@ -248,6 +251,30 @@ def summarize_results(results: Iterable[ProbeResult], *, slow_threshold_ms: floa
         "ok": len(rows) - failed,
         "failed": failed,
         "slow": slow,
+    }
+
+
+def _sanitize_output_value(*, key: str, value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(k): _sanitize_output_value(key=str(k), value=v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_output_value(key=key, value=item) for item in value]
+    return _mask_detail_value(key, value)
+
+
+def _sanitize_details(details: Mapping[str, Any]) -> Dict[str, Any]:
+    return {str(key): _sanitize_output_value(key=str(key), value=value) for key, value in details.items()}
+
+
+def build_results_payload(results: Iterable[ProbeResult], summary: Mapping[str, int]) -> Dict[str, Any]:
+    rows_out: List[Dict[str, Any]] = []
+    for row in results:
+        payload = row.to_dict()
+        payload["details"] = _sanitize_details(row.details)
+        rows_out.append(payload)
+    return {
+        "summary": {str(key): int(value) for key, value in summary.items()},
+        "results": rows_out,
     }
 
 
@@ -696,7 +723,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     results = run_selected_probes(settings, env)
     summary = summarize_results(results, slow_threshold_ms=settings.slow_threshold_ms)
     if settings.json_output:
-        print(json.dumps({"summary": summary, "results": [row.to_dict() for row in results]}, ensure_ascii=False, indent=2))
+        print(json.dumps(build_results_payload(results, summary), ensure_ascii=False, indent=2))
     else:
         print(format_results_text(results, summary))
     return 0 if summary["failed"] == 0 else 1
