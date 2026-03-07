@@ -1,0 +1,15 @@
+# Public HTTP probes use Python stdlib; WebSocket probes need websocket-client.
+websocket-client>=1.8.0
+
+# Predict auth probe
+requests
+eth-account
+
+# Needed when Predict auth uses PREDICT_ACCOUNT_ADDRESS mode.
+predict-sdk
+
+# PM auth / user WS / relayer probes
+py-clob-client
+web3
+py-builder-relayer-client
+py-builder-signing-sdk
