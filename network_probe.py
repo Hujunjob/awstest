@@ -9,6 +9,8 @@ and fast enough before starting live processes.
 from __future__ import annotations
 
 import argparse
+import importlib
+import importlib.util
 import json
 import os
 import sqlite3
@@ -416,6 +418,27 @@ def _require(value: str, *, what: str) -> str:
     return text
 
 
+def _import_repo_module(module_name: str, relative_path: str) -> Any:
+    try:
+        return importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        top_level = module_name.split(".", 1)[0]
+        missing = str(getattr(exc, "name", "") or "")
+        if missing not in {top_level, module_name}:
+            raise
+        module_path = (REPO_ROOT / relative_path).resolve()
+        if not module_path.exists():
+            raise
+        spec_name = f"_network_probe_{module_name.replace('.', '_')}"
+        spec = importlib.util.spec_from_file_location(spec_name, module_path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"could not load module spec for {module_path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec_name] = module
+        spec.loader.exec_module(module)
+        return module
+
+
 def _load_websocket_module():
     try:
         import websocket  # type: ignore
@@ -530,7 +553,7 @@ def _probe_predict_auth_message(env: Dict[str, str], settings: ProbeSettings, _t
 
 
 def _probe_predict_auth_jwt(env: Dict[str, str], _settings: ProbeSettings, _targets: SampleTargets) -> ProbeResult:
-    from predict_pm_consumer import predict_live_executor_py as predict_exec
+    predict_exec = _import_repo_module("predict_pm_consumer.predict_live_executor_py", "predict_pm_consumer/predict_live_executor_py.py")
 
     started = time.monotonic()
     with _temporary_environ(env):
@@ -586,7 +609,7 @@ def _resolve_pm_user_ws_auth(env: Dict[str, str]) -> Dict[str, str]:
     if api_key and api_secret and api_passphrase:
         return {"apiKey": api_key, "secret": api_secret, "passphrase": api_passphrase}
 
-    from predict_pm_consumer import polymarket_live_executor_py as pm_exec
+    pm_exec = _import_repo_module("predict_pm_consumer.polymarket_live_executor_py", "predict_pm_consumer/polymarket_live_executor_py.py")
 
     private_key = _require(env.get("PM_PRIVATE_KEY", ""), what="PM_PRIVATE_KEY")
     chain_id = int(_env_value(env, "PM_CHAIN_ID", default="137") or "137")
@@ -615,7 +638,7 @@ def _resolve_pm_user_ws_auth(env: Dict[str, str]) -> Dict[str, str]:
 
 
 def _probe_pm_clob_auth(env: Dict[str, str], _settings: ProbeSettings, _targets: SampleTargets) -> ProbeResult:
-    from predict_pm_consumer import polymarket_live_executor_py as pm_exec
+    pm_exec = _import_repo_module("predict_pm_consumer.polymarket_live_executor_py", "predict_pm_consumer/polymarket_live_executor_py.py")
 
     private_key = _require(env.get("PM_PRIVATE_KEY", ""), what="PM_PRIVATE_KEY")
     chain_id = int(_env_value(env, "PM_CHAIN_ID", default="137") or "137")
@@ -649,7 +672,7 @@ def _probe_pm_ws_user(env: Dict[str, str], settings: ProbeSettings, _targets: Sa
 
 
 def _probe_pm_relayer_ready(env: Dict[str, str], _settings: ProbeSettings, _targets: SampleTargets) -> ProbeResult:
-    from predict_pm_consumer import polymarket_live_executor_py as pm_exec
+    pm_exec = _import_repo_module("predict_pm_consumer.polymarket_live_executor_py", "predict_pm_consumer/polymarket_live_executor_py.py")
 
     private_key = _require(env.get("PM_PRIVATE_KEY", ""), what="PM_PRIVATE_KEY")
     chain_id = int(_env_value(env, "PM_CHAIN_ID", default="137") or "137")
