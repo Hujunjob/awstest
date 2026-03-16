@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import threading
@@ -15,6 +16,20 @@ from heartbeat.server.config import load_config
 from heartbeat.server.scanner import scan_once
 from heartbeat.server.store import Store
 
+LOGGER = logging.getLogger(__name__)
+
+
+def run_scan_cycle(*, store: Store, config, bark_client, now: datetime) -> None:
+    try:
+        scan_once(
+            store=store,
+            config=config,
+            bark_client=bark_client,
+            now=now,
+        )
+    except Exception:
+        LOGGER.exception("Heartbeat scan failed")
+
 
 def _scanner_loop(stop_event: threading.Event) -> None:
     config = load_config()
@@ -23,7 +38,7 @@ def _scanner_loop(stop_event: threading.Event) -> None:
     bark_client = BarkClient(config)
 
     while not stop_event.is_set():
-        scan_once(
+        run_scan_cycle(
             store=store,
             config=config,
             bark_client=bark_client,
