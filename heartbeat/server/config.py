@@ -18,6 +18,7 @@ class Config:
     heartbeat_late_seconds: int = 60
     heartbeat_timeout_seconds: int = 300
     alert_repeat_seconds: int = 30
+    wallet_alert_repeat_seconds: int = 600
     scan_interval_seconds: int = 60
 
 
@@ -57,5 +58,6 @@ def load_config() -> Config:
         heartbeat_late_seconds=int(os.environ.get("HEARTBEAT_LATE_SECONDS", "60")),
         heartbeat_timeout_seconds=int(os.environ.get("HEARTBEAT_TIMEOUT_SECONDS", "300")),
         alert_repeat_seconds=int(os.environ.get("ALERT_REPEAT_SECONDS", "30")),
+        wallet_alert_repeat_seconds=int(os.environ.get("WALLET_ALERT_REPEAT_SECONDS", "600")),
         scan_interval_seconds=int(os.environ.get("SCAN_INTERVAL_SECONDS", "60")),
     )

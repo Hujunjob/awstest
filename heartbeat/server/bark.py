@@ -10,17 +10,24 @@ class BarkClient:
         self.config = config
         self.session = session or requests.Session()
 
-    def send_alert(self, *, agent_name: str, body: str) -> None:
+    def send_alert(
+        self,
+        *,
+        agent_name: str,
+        body: str,
+        title: str | None = None,
+        group: str | None = None,
+    ) -> None:
         response = self.session.post(
             f"{self.config.bark_base_url}/push",
             json={
                 "device_key": self.config.bark_device_key,
-                "title": f"Heartbeat alert: {agent_name}",
+                "title": title or f"Heartbeat alert: {agent_name}",
                 "body": body,
                 "level": "critical",
                 "call": "1",
                 "sound": self.config.bark_sound,
-                "group": f"heartbeat/{agent_name}",
+                "group": group or f"heartbeat/{agent_name}",
             },
             timeout=10,
         )

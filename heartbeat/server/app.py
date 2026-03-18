@@ -56,6 +56,37 @@ def create_app(config: Config | None = None) -> Flask:
             }
         )
 
+    @app.post("/api/v1/wallets/<wallet_name>/status")
+    def wallet_status(wallet_name: str):
+        unauthorized = require_auth()
+        if unauthorized is not None:
+            return unauthorized
+
+        payload = request.get_json(silent=True) or {}
+        app.config["STORE"].record_wallet_status(wallet_name, payload)
+        return jsonify({"wallet_name": wallet_name, "status": "accepted"}), 202
+
+    @app.get("/api/v1/wallets/<wallet_name>")
+    def inspect_wallet(wallet_name: str):
+        unauthorized = require_auth()
+        if unauthorized is not None:
+            return unauthorized
+
+        row = app.config["STORE"].get_wallet(wallet_name)
+        if row is None:
+            abort(404)
+
+        return jsonify(
+            {
+                "wallet_name": row["wallet_name"],
+                "client_name": row["client_name"],
+                "last_seen_at": row["last_seen_at"],
+                "status": row["status"],
+                "last_alert_at": row["last_alert_at"],
+                "last_payload": app.config["STORE"].decode_payload(row["last_payload"]),
+            }
+        )
+
     return app
 
 
